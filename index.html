@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 智能健康生活紀錄器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        .progress-ring__circle {
+            transition: stroke-dashoffset 0.35s;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;  
+            scrollbar-width: none;  
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <div id="toast" class="fixed top-5 right-5 z-50 transform translate-y-[-150%] transition-transform duration-300 ease-out bg-white shadow-xl border-l-4 border-emerald-500 rounded-r-lg p-4 max-w-sm flex items-start gap-3 pointer-events-none">
+        <div id="toast-icon" class="text-emerald-500 mt-0.5"><i class="fas fa-check-circle text-lg"></i></div>
+        <div>
+            <h4 id="toast-title" class="font-semibold text-sm text-slate-900">成功</h4>
+            <p id="toast-message" class="text-xs text-slate-500 mt-1">操作已成功完成。</p>
+        </div>
+    </div>
+
+    <div id="confirm-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-2xl shadow-xl overflow-hidden transform transition-all p-6 space-y-4">
+            <div class="flex items-center gap-3 text-red-500">
+                <div class="bg-red-50 p-2 rounded-xl">
+                    <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                </div>
+                <h3 class="font-bold text-slate-900 text-base" id="confirm-title">確定執行此操作？</h3>
+            </div>
+            <p class="text-xs text-slate-500 leading-relaxed" id="confirm-message">此動作執行後將可能無法還原，請確認您是否要繼續。</p>
+            <div class="flex justify-end gap-2 pt-2">
+                <button id="confirm-btn-cancel" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition">
+                    取消
+                </button>
+                <button id="confirm-btn-yes" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-xl shadow-sm transition active:scale-95">
+                    確認刪除
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-14 items-center border-b border-slate-100">
+                <div class="flex items-center gap-2">
+                    <div class="bg-gradient-to-tr from-emerald-400 to-teal-500 text-white p-2 rounded-xl shadow-md shadow-emerald-100 flex items-center justify-center">
+                        <i class="fa-solid fa-heart-pulse text-lg"></i>
+                    </div>
+                    <div>
+                        <span class="font-bold text-base bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">NuTrack AI</span>
+                        <span class="text-[9px] block text-slate-400 font-medium">個人智慧健康生活助手</span>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-2">
+                    <div id="cloud-status-badge" class="bg-blue-50 text-blue-700 text-[10px] sm:text-xs px-2.5 py-1 rounded-full font-semibold border border-blue-100 flex items-center gap-1.5">
+                        <i class="fa-solid fa-cloud-arrow-up animate-pulse"></i>
+                        <span>雲端連線中</span>
+                    </div>
+                    
+                    <div class="bg-emerald-50 text-emerald-700 text-[10px] sm:text-xs px-2.5 py-1 rounded-full font-semibold border border-emerald-100 flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        AI 在線
+                    </div>
+                </div>
+            </div>
+
+            <div class="relative py-2">
+                <nav class="flex overflow-x-auto no-scrollbar gap-1 whitespace-nowrap py-1 scroll-smooth" id="top-nav-bar">
+                    <button onclick="switchTab('dashboard')" class="tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 text-emerald-700 bg-emerald-50 flex items-center shrink-0" id="tab-dashboard">
+                        <i class="fa-solid fa-chart-pie mr-1.5 text-xs sm:text-sm"></i>儀表板
+                    </button>
+                    <button onclick="switchTab('diet')" class="tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center shrink-0" id="tab-diet">
+                        <i class="fa-solid fa-utensils mr-1.5 text-xs sm:text-sm"></i>飲食紀錄
+                    </button>
+                    <button onclick="switchTab('history')" class="tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center shrink-0" id="tab-history">
+                        <i class="fa-solid fa-clock-rotate-left mr-1.5 text-xs sm:text-sm"></i>歷史回顧
+                    </button>
+                    <button onclick="switchTab('profile')" class="tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center shrink-0" id="tab-profile">
+                        <i class="fa-solid fa-user-gear mr-1.5 text-xs sm:text-sm"></i>個人設定
+                    </button>
+                    <button onclick="switchTab('coach')" class="tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center shrink-0" id="tab-coach">
+                        <i class="fa-solid fa-wand-magic-sparkles mr-1.5 text-xs sm:text-sm"></i>AI 健康教練
+                    </button>
+                </nav>
+                <div class="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent block lg:hidden"></div>
+            </div>
+        </div>
+    </header>
+
+    <section class="bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-calendar-days text-emerald-100"></i>
+                <span class="text-xs font-semibold text-emerald-100">當前健康紀錄日期：</span>
+            </div>
+            <div class="flex items-center gap-1 bg-white/10 p-1 rounded-xl border border-white/10">
+                <button onclick="changeActiveDateByOffset(-1)" class="p-2 hover:bg-white/10 rounded-lg transition active:scale-95 text-white" title="前一天">
+                    <i class="fa-solid fa-chevron-left text-xs"></i>
+                </button>
+                <div class="relative flex items-center">
+                    <input type="date" id="header-active-date-picker" onchange="onHeaderDatePickerChange(this.value)" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full">
+                    <span id="header-date-string" class="px-4 py-1 text-xs font-bold bg-white/20 hover:bg-white/30 rounded-lg transition cursor-pointer select-none">
+                        載入中...
+                    </span>
+                </div>
+                <button onclick="changeActiveDateByOffset(1)" class="p-2 hover:bg-white/10 rounded-lg transition active:scale-95 text-white" title="後一天">
+                    <i class="fa-solid fa-chevron-right text-xs"></i>
+                </button>
+                <button onclick="jumpToToday()" class="text-[10px] font-bold px-2 py-1 bg-white text-emerald-700 rounded-lg hover:bg-emerald-50 active:scale-95 transition ml-1" title="回到今天">
+                    今天
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 lg:pb-12 w-full">
+        
+        <section id="section-dashboard" class="space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col items-center relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-emerald-400 to-teal-500"></div>
+                    <h3 class="text-slate-500 font-semibold text-sm self-start mb-4">
+                        <span class="active-date-lbl">今日</span>卡路里預算
+                    </h3>
+                    
+                    <div class="relative w-48 h-48 flex items-center justify-center">
+                        <svg class="w-full h-full transform -rotate-90">
+                            <circle cx="96" cy="96" r="84" stroke="#f1f5f9" stroke-width="12" fill="transparent" />
+                            <circle id="calorie-progress-circle" cx="96" cy="96" r="84" stroke="url(#emerald-gradient)" stroke-width="12" fill="transparent"
+                                stroke-dasharray="527.7" stroke-dashoffset="527.7" stroke-linecap="round" class="progress-ring__circle transition-all duration-500" />
+                            <defs>
+                                <linearGradient id="emerald-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#34d399" />
+                                    <stop offset="100%" stop-color="#14b8a6" />
+                                </linearGradient>
+                            </defs>
+                        </svg>
+                        <div class="absolute flex flex-col items-center text-center">
+                            <span id="calories-remaining" class="text-3xl font-extrabold text-slate-800">1,800</span>
+                            <span id="calories-remaining-label" class="text-[11px] font-semibold text-slate-400 tracking-wider mt-1">剩餘大卡</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-4 w-full mt-6 border-t border-slate-100 pt-4 text-center">
+                        <div>
+                            <span id="calories-budget" class="block font-bold text-slate-800">2,000</span>
+                            <span class="text-[10px] text-slate-400">設定目標</span>
+                        </div>
+                        <div class="border-x border-slate-100">
+                            <span id="calories-consumed" class="block font-bold text-emerald-600">200</span>
+                            <span class="text-[10px] text-slate-400">當天攝取</span>
+                        </div>
+                        <div>
+                            <span id="calories-burned" class="block font-bold text-amber-500">0</span>
+                            <span class="text-[10px] text-slate-400">日常+運動消耗</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div>
+                        <h3 class="text-slate-500 font-semibold text-sm mb-4">三大營養素達成度</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <div class="flex justify-between text-xs font-semibold mb-1">
+                                    <span class="text-slate-600"><i class="fa-solid fa-wheat-awn text-amber-500 mr-1.5"></i>碳水化合物 (Carbs)</span>
+                                    <span class="text-slate-500" id="carbs-ratio">25g / 250g</span>
+                                </div>
+                                <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                                    <div id="carbs-bar" class="bg-amber-500 h-full rounded-full transition-all duration-500" style="width: 10%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-xs font-semibold mb-1">
+                                    <span class="text-slate-600"><i class="fa-solid fa-egg text-emerald-500 mr-1.5"></i>蛋白質 (Protein)</span>
+                                    <span class="text-slate-500" id="protein-ratio">15g / 100g</span>
+                                </div>
+                                <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                                    <div id="protein-bar" class="bg-emerald-500 h-full rounded-full transition-all duration-500" style="width: 15%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-xs font-semibold mb-1">
+                                    <span class="text-slate-600"><i class="fa-solid fa-droplet text-sky-500 mr-1.5"></i>脂肪 (Fat)</span>
+                                    <span class="text-slate-500" id="fat-ratio">6g / 67g</span>
+                                </div>
+                                <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                                    <div id="fat-bar" class="bg-sky-500 h-full rounded-full transition-all duration-500" style="width: 9%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-6 p-3 bg-emerald-50/50 rounded-xl border border-emerald-100/50 flex items-center gap-3">
+                        <i class="fa-solid fa-circle-info text-emerald-600 text-sm"></i>
+                        <p class="text-xs text-emerald-800 leading-relaxed font-medium">
+                            三大營養素比例依據您的 <span id="current-goal-tag">減重</span> 目標，以最佳比例調配。
+                        </p>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div class="space-y-4">
+                        <h3 class="text-slate-500 font-semibold text-sm">指定日快速紀錄</h3>
+                        
+                        <div class="p-3 bg-sky-50/50 border border-sky-100 rounded-xl">
+                            <div class="flex justify-between items-center mb-1.5">
+                                <span class="text-[11px] font-bold text-sky-950"><i class="fa-solid fa-glass-water mr-1.5 text-sky-500"></i>水分攝取</span>
+                                <span class="text-[11px] font-bold text-sky-700" id="water-text">500 / 2500 ml</span>
+                            </div>
+                            <div class="flex gap-2 items-center">
+                                <div class="flex-grow bg-slate-100 h-2 rounded-full overflow-hidden">
+                                    <div id="water-bar" class="bg-sky-400 h-full rounded-full transition-all duration-500" style="width: 20%"></div>
+                                </div>
+                                <button onclick="addWater(250)" class="bg-sky-500 hover:bg-sky-600 text-white w-7 h-7 rounded-full flex items-center justify-center shadow-sm text-[10px] font-bold">+250</button>
+                            </div>
+                        </div>
+
+                        <div class="p-3 bg-purple-50/50 border border-purple-100 rounded-xl">
+                            <div class="flex justify-between items-center mb-1.5">
+                                <span class="text-[11px] font-bold text-purple-950"><i class="fa-solid fa-weight-scale mr-1.5 text-purple-500"></i>體重紀錄</span>
+                                <span class="text-[11px] font-bold text-purple-700" id="weight-quick-lbl">72.0 kg</span>
+                            </div>
+                            <div class="flex gap-1.5">
+                                <input type="number" id="quick-weight-input" step="0.1" placeholder="體重" class="w-full bg-white border border-slate-200 text-xs px-2 py-1 rounded-lg focus:outline-none">
+                                <button onclick="quickLogWeight()" class="bg-purple-600 hover:bg-purple-700 text-white text-[11px] px-2.5 py-1 rounded-lg font-bold shadow-sm whitespace-nowrap">儲存</button>
+                            </div>
+                        </div>
+
+                        <div class="p-3 bg-amber-50/50 border border-amber-100 rounded-xl">
+                            <div class="flex justify-between items-center mb-1.5">
+                                <span class="text-[11px] font-bold text-amber-950"><i class="fa-solid fa-fire mr-1.5 text-amber-500"></i>額外運動消耗</span>
+                                <span class="text-[11px] font-bold text-amber-700" id="burn-quick-lbl">0 kcal</span>
+                            </div>
+                            <div class="flex gap-1.5">
+                                <input type="number" id="quick-burn-input" step="10" placeholder="大卡" class="w-full bg-white border border-slate-200 text-xs px-2 py-1 rounded-lg focus:outline-none">
+                                <button onclick="quickLogBurn()" class="bg-amber-500 hover:bg-amber-600 text-white text-[11px] px-2.5 py-1 rounded-lg font-bold shadow-sm whitespace-nowrap">儲存</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-center text-xs text-slate-400 mt-4 border-t border-slate-100 pt-2">
+                        選定日期：<span id="current-date-lbl" class="font-bold text-slate-600">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+                <h3 class="text-lg font-bold text-slate-900 mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles text-emerald-500 animate-pulse"></i>AI 智慧一鍵記錄飲食
+                </h3>
+                <p class="text-xs text-slate-500 mb-4">輸入您在 <strong class="active-date-lbl text-emerald-600">今日</strong> 吃了什麼，或者拍照上傳，AI 立即自動計算卡路里及營養價值！</p>
+                <div class="space-y-4">
+                    <div class="flex flex-col lg:flex-row gap-3">
+                        <div class="flex-grow">
+                            <textarea id="ai-food-text-input" rows="2" placeholder="例如：午餐吃了一盤炒青菜跟半碗牛肉麵" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm focus:outline-none placeholder:text-slate-400"></textarea>
+                        </div>
+                        <div class="flex flex-col justify-between gap-2 lg:w-52">
+                            <label class="border border-dashed border-slate-300 hover:border-emerald-400 rounded-xl flex flex-col items-center justify-center py-3 px-2 cursor-pointer h-full group text-center relative overflow-hidden">
+                                <input type="file" id="ai-food-file-input" accept="image/*" class="hidden" onchange="previewUpload(event)">
+                                <div id="upload-prompt" class="flex flex-col items-center">
+                                    <i class="fa-solid fa-camera text-slate-400 group-hover:text-emerald-500 mb-1 text-lg"></i>
+                                    <span class="text-xs text-slate-600 group-hover:text-emerald-700 font-medium">上傳食物照片</span>
+                                </div>
+                                <div id="upload-preview-container" class="hidden absolute inset-0 bg-slate-900 flex items-center justify-center">
+                                    <img id="upload-preview-img" src="" class="w-full h-full object-cover">
+                                    <button type="button" onclick="cancelImage(event)" class="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] shadow"><i class="fa-solid fa-times"></i></button>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
+                        <div class="flex items-center gap-2">
+                            <label for="ai-meal-type" class="text-xs font-semibold text-slate-500">餐次：</label>
+                            <select id="ai-meal-type" class="bg-slate-100 border-0 rounded-lg text-xs font-semibold text-slate-700 py-1.5 px-3 focus:outline-none">
+                                <option value="早餐">早餐</option>
+                                <option value="午餐" selected>午餐</option>
+                                <option value="晚餐">晚餐</option>
+                                <option value="點心">點心/宵夜</option>
+                            </select>
+                        </div>
+                        <button onclick="analyzeDietWithAI()" id="ai-analyze-btn" class="bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-sm font-bold py-2.5 px-6 rounded-xl shadow-sm flex items-center gap-2 transition active:scale-95">
+                            <i class="fa-solid fa-brain"></i>AI 智能分析並記錄
+                        </button>
+                    </div>
+                </div>
+                <div id="ai-loading-status" class="hidden mt-4 p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center gap-3">
+                    <div class="animate-spin text-emerald-500"><i class="fa-solid fa-circle-notch text-xl"></i></div>
+                    <span class="text-xs text-slate-600 font-semibold" id="ai-loading-text">AI 正在努力分析中...</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 class="font-bold text-slate-800 text-sm mb-4">卡路里攝取歷史 (近7日)</h3>
+                    <div class="h-64 relative"><canvas id="caloriesChart"></canvas></div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <h3 class="font-bold text-slate-800 text-sm mb-4">體重控制趨勢 (kg)</h3>
+                    <div class="h-64 relative"><canvas id="weightChart"></canvas></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="section-diet" class="hidden space-y-6">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-800">飲食細節明細</h2>
+                    <p class="text-xs text-slate-500 mt-1">管理在 <strong class="active-date-lbl text-emerald-600">指定日期</strong> 的餐點。</p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="openManualMealModal()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-2 px-4 rounded-xl flex items-center gap-1.5 transition">手動新增食物</button>
+                    <button onclick="promptClearLogs()" class="border border-red-200 text-red-500 text-xs font-bold py-2 px-4 rounded-xl flex items-center gap-1.5 transition">清空此日數據</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm flex flex-col justify-between">
+                    <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                        <span class="font-bold text-sm text-slate-800">早餐</span>
+                        <span class="text-xs font-bold bg-slate-200 text-slate-700 py-1 px-2.5 rounded-full" id="breakfast-sum">0 kcal</span>
+                    </div>
+                    <div class="p-5 flex-grow min-h-[120px] divide-y divide-slate-100" id="breakfast-list"></div>
+                </div>
+                <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm flex flex-col justify-between">
+                    <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                        <span class="font-bold text-sm text-slate-800">午餐</span>
+                        <span class="text-xs font-bold bg-slate-200 text-slate-700 py-1 px-2.5 rounded-full" id="lunch-sum">0 kcal</span>
+                    </div>
+                    <div class="p-5 flex-grow min-h-[120px] divide-y divide-slate-100" id="lunch-list"></div>
+                </div>
+                <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm flex flex-col justify-between">
+                    <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                        <span class="font-bold text-sm text-slate-800">晚餐</span>
+                        <span class="text-xs font-bold bg-slate-200 text-slate-700 py-1 px-2.5 rounded-full" id="dinner-sum">0 kcal</span>
+                    </div>
+                    <div class="p-5 flex-grow min-h-[120px] divide-y divide-slate-100" id="dinner-list"></div>
+                </div>
+                <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm flex flex-col justify-between">
+                    <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                        <span class="font-bold text-sm text-slate-800">點心 / 零食</span>
+                        <span class="text-xs font-bold bg-slate-200 text-slate-700 py-1 px-2.5 rounded-full" id="snacks-sum">0 kcal</span>
+                    </div>
+                    <div class="p-5 flex-grow min-h-[120px] divide-y divide-slate-100" id="snacks-list"></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="section-history" class="hidden space-y-6">
+            <div>
+                <h2 class="text-2xl font-bold text-slate-800">健康歷史回顧</h2>
+                <p class="text-xs text-slate-500 mt-1">綜觀過去 14 天的飲食與身體數據趨勢。</p>
+            </div>
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-100 text-[11px] font-extrabold text-slate-400 uppercase tracking-wider">
+                                <th class="py-3 px-4">日期</th>
+                                <th class="py-3 px-4">攝取 / 運動</th>
+                                <th class="py-3 px-4">目標額度</th>
+                                <th class="py-3 px-4">狀態</th>
+                                <th class="py-3 px-4">水分</th>
+                                <th class="py-3 px-4">體重</th>
+                                <th class="py-3 px-4 text-center">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body" class="divide-y divide-slate-100 text-xs font-medium text-slate-600"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="section-profile" class="hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm lg:col-span-2 space-y-6">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800">身體組成與目標設定</h2>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1.5">身高 (cm)</label>
+                            <input type="number" id="profile-height" value="175" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1.5">目前體重 (kg)</label>
+                            <input type="number" id="profile-weight" value="72" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1.5">年齡 (歲)</label>
+                            <input type="number" id="profile-age" value="28" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1.5">性別</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button onclick="setGender('male')" id="gender-male" class="gender-btn py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold">男性</button>
+                                <button onclick="setGender('female')" id="gender-female" class="gender-btn py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold">女性</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 mb-1.5">日常生活活動量</label>
+                            <select id="profile-activity" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none">
+                                <option value="1.2">久坐無規律運動</option>
+                                <option value="1.375">輕度活動</option>
+                                <option value="1.55" selected>中度活動</option>
+                                <option value="1.725">高度活動</option>
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-600 mb-1.5">終極目標</label>
+                                <select id="profile-goal" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none">
+                                    <option value="lose" selected>減重減脂</option>
+                                    <option value="maintain">維持體重</option>
+                                    <option value="gain">增肌塑形</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-slate-600 mb-1.5">目標體重 (kg)</label>
+                                <input type="number" id="profile-target-weight" value="65" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-5 bg-gradient-to-tr from-slate-900 to-slate-800 text-white rounded-2xl border border-slate-700 space-y-4 shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <h4 class="font-bold text-sm text-emerald-400 flex items-center gap-2">
+                                <i class="fa-solid fa-cloud"></i>雲端同步與帳號管理
+                            </h4>
+                            <span id="account-type-badge" class="text-[10px] bg-slate-700 text-slate-300 px-2 py-0.5 rounded font-bold border border-slate-600">
+                                未登入
+                            </span>
+                        </div>
+                        
+                        <div id="google-auth-container" class="py-2">
+                            <button onclick="loginWithGoogle()" id="btn-google-login" class="w-full bg-white hover:bg-slate-50 text-slate-700 text-sm font-bold py-2.5 px-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-center gap-2 transition active:scale-95">
+                                <svg class="w-5 h-5" viewBox="0 0 24 24">
+                                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z"/>
+                                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.85c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                                </svg>
+                                使用 Google 帳號登入同步
+                            </button>
+                            <button onclick="logoutFirebase()" id="btn-google-logout" class="hidden w-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold py-2 px-4 rounded-xl transition active:scale-95">
+                                登出目前帳號
+                            </button>
+                        </div>
+
+                        <div class="space-y-2 text-[11px] text-slate-300 border-t border-slate-700/60 pt-3">
+                            <div class="flex flex-col sm:flex-row gap-2">
+                                <input type="text" id="profile-cloud-id" readonly class="w-full bg-slate-950/60 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-slate-400 select-all" value="載入中...">
+                                <button onclick="copyUserId()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs px-3 py-2 rounded-xl transition whitespace-nowrap">複製金鑰</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 border-t border-slate-100 flex justify-end">
+                        <button onclick="saveUserProfile()" class="bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold py-3 px-6 rounded-xl shadow-sm transition">儲存更新</button>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 text-white p-6 rounded-2xl shadow-xl flex flex-col justify-between relative overflow-hidden">
+                    <div class="space-y-6">
+                        <h3 class="font-bold text-slate-100 text-sm">數據分析結果</h3>
+                        <div class="space-y-4">
+                            <div class="border-b border-slate-800 pb-3">
+                                <span class="text-xs text-slate-400 block">BMI 指數</span>
+                                <div class="flex items-baseline gap-2 mt-0.5">
+                                    <span id="res-bmi" class="text-2xl font-extrabold">--</span>
+                                    <span id="res-bmi-lbl" class="text-xs font-semibold px-2 py-0.5 rounded">--</span>
+                                </div>
+                            </div>
+                            <div class="border-b border-slate-800 pb-3">
+                                <span class="text-xs text-slate-400 block">BMR 基礎代謝率</span>
+                                <span id="res-bmr" class="text-xl font-bold block mt-0.5">-- 大卡</span>
+                            </div>
+                            <div class="border-b border-slate-800 pb-3">
+                                <span class="text-xs text-slate-400 block">TDEE 每日總能消耗</span>
+                                <span id="res-tdee" class="text-xl font-bold block mt-0.5">-- 大卡</span>
+                            </div>
+                            <div>
+                                <span class="text-xs text-slate-400 block">建議攝取熱量目標</span>
+                                <span id="res-budget" class="text-2xl font-extrabold text-emerald-400 block mt-0.5">-- 大卡</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="section-coach" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-100">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-900">AI 智能健康隨身教練</h2>
+                        <p class="text-xs text-slate-500 mt-1">分析您的生理數據、熱量與運動，提供精確點評。</p>
+                    </div>
+                    <button onclick="generateAICoachAdvice()" class="bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-sm font-bold py-3 px-6 rounded-xl shadow-sm transition active:scale-95 whitespace-nowrap">生成個人化 AI 建議</button>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 pt-6">
+                    <div class="lg:col-span-1 space-y-4">
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <span class="text-[11px] font-bold text-slate-400 block">目前BMI值</span>
+                            <span id="coach-bmi" class="text-xl font-extrabold text-slate-800 block mt-0.5">--</span>
+                        </div>
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <span class="text-[11px] font-bold text-slate-400 block">該日卡路里餘額</span>
+                            <span id="coach-cal-rem" class="text-xl font-extrabold text-slate-800 block mt-0.5">--</span>
+                        </div>
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <span class="text-[11px] font-bold text-slate-400 block">建議宏量配比</span>
+                            <span id="coach-macro-ratio" class="text-xs text-indigo-600 font-bold block mt-1">--% / --% / --%</span>
+                        </div>
+                    </div>
+                    <div class="lg:col-span-3 bg-slate-50 rounded-2xl border border-slate-200 p-6 min-h-[300px] flex flex-col justify-between">
+                        <div id="coach-advice-container" class="prose prose-slate max-w-none text-slate-700 space-y-4">
+                            <div class="text-center py-12 text-slate-400">點擊右上角的「生成個人化 AI 建議」開始諮詢。</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="manual-meal-modal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden transform transition-all flex flex-col">
+            <div class="px-6 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                <h3 class="font-bold text-slate-800 text-sm">手動新增食物</h3>
+                <button onclick="closeManualMealModal()" class="text-slate-400"><i class="fa-solid fa-times text-lg"></i></button>
+            </div>
+            <div class="p-6 space-y-4 flex-grow">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 mb-1">食物名稱</label>
+                    <input type="text" id="manual-food-name" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">餐次類別</label>
+                        <select id="manual-meal-category" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none">
+                            <option value="早餐">早餐</option>
+                            <option value="午餐" selected>午餐</option>
+                            <option value="晚餐">晚餐</option>
+                            <option value="點心">點心/宵夜</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 mb-1">熱量 (kcal)</label>
+                        <input type="number" id="manual-food-calories" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none">
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-3 pt-2">
+                    <input type="number" id="manual-food-carbs" placeholder="碳水(g)" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none">
+                    <input type="number" id="manual-food-protein" placeholder="蛋白質(g)" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none">
+                    <input type="number" id="manual-food-fat" placeholder="脂肪(g)" class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none">
+                </div>
+            </div>
+            <div class="px-6 py-4 bg-slate-50 border-t flex justify-end gap-2.5">
+                <button onclick="closeManualMealModal()" class="px-4 py-2 bg-white border border-slate-200 text-xs font-bold rounded-xl text-slate-600">取消</button>
+                <button onclick="submitManualMeal()" class="px-5 py-2 bg-emerald-500 text-white text-xs font-bold rounded-xl shadow-sm">新增紀錄</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Helper Functions 
+        function getTodayDateString() {
+            const today = new Date();
+            return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        }
+
+        function parseDate(dateStr) {
+            const parts = dateStr.split('-');
+            return new Date(parts[0], parts[1] - 1, parts[2]);
+        }
+
+        function formatDate(date) {
+            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        }
+
+        function formatDateString(dateStr) {
+            if (!dateStr) return "";
+            const dateObj = parseDate(dateStr);
+            const todayStr = getTodayDateString();
+            let tag = dateStr === todayStr ? " (今天)" : "";
+            return `${dateObj.getFullYear()}年${dateObj.getMonth() + 1}月${dateObj.getDate()}日${tag}`;
+        }
+
+        // ==========================================
+        // 🔐 你的專屬 Firebase 與 AI 核心金鑰配置區
+        // ==========================================
+        const STORAGE_KEY = 'nutrack_ai_data_v2';
+        const appId = 'nutrack-ai-app-default';
+        
+        // 1. 將你獲取的完整 Firebase Web 配置填入此處
+        const __firebase_config = JSON.stringify({
+            apiKey: "AIzaSyD3GEITzzpkxXg8Z1ysYZ8y64lIXYo5QuU",
+            authDomain: "aihealth-90e0a.firebaseapp.com",
+            projectId: "aihealth-90e0a",
+            storageBucket: "aihealth-90e0a.firebasestorage.app",
+            messagingSenderId: "211758133337",
+            appId: "1:211758133337:web:405d11744dc856c0e80148",
+            measurementId: "G-1CWV4VB3T2"
+        });
+
+        // 2. 填入你的 Google Gemini API Key（若有），用於啟動 AI 食物分析功能
+        const apiKey = ""; 
+
+        // ==========================================
+        
+        let db = null;
+        let auth = null;
+        let isCloudEnabled = false;
+        let currentUserId = "";
+
+        let activeDate = getTodayDateString(); 
+        let userProfile = { height: 175, weight: 72, age: 28, gender: 'male', activity: 1.55, goal: 'lose', targetWeight: 65 };
+        let dietLogs = {}; 
+        
+        dietLogs[activeDate] = { meals: [], water: 0, weight: userProfile.weight, burned: 0 };
+
+        let caloriesChartInstance = null;
+        let weightChartInstance = null;
+
+        let firebase_doc, firebase_setDoc, firebase_getDoc, firebase_getDocs, firebase_collection;
+        let firebase_signInAnonymously, firebase_onAuthStateChanged, firebase_GoogleAuthProvider, firebase_signInWithPopup, firebase_signOut;
+
+        // Register core event functions globally
+        window.switchTab = switchTab; 
+        window.changeActiveDateByOffset = changeActiveDateByOffset; 
+        window.onHeaderDatePickerChange = onHeaderDatePickerChange;
+        window.jumpToToday = jumpToToday; 
+        window.addWater = addWater; 
+        window.quickLogWeight = quickLogWeight; 
+        window.quickLogBurn = quickLogBurn;
+        window.analyzeDietWithAI = analyzeDietWithAI; 
+        window.generateAICoachAdvice = generateAICoachAdvice; 
+        window.openManualMealModal = openManualMealModal;
+        window.closeManualMealModal = closeManualMealModal; 
+        window.submitManualMeal = submitManualMeal; 
+        window.deleteMealItem = deleteMealItem;
+        window.promptClearLogs = promptClearLogs; 
+        window.setGender = setGender; 
+        window.saveUserProfile = saveUserProfile; 
+        window.previewUpload = previewUpload;
+        window.cancelImage = cancelImage; 
+        window.changeActiveDateDirectly = changeActiveDateDirectly; 
+        window.copyUserId = copyUserId;
+        window.loginWithGoogle = loginWithGoogle; 
+        window.logoutFirebase = logoutFirebase;
+
+        function generateUUID() {
+            if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+                return crypto.randomUUID();
+            }
+            return 'off-' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        }
+
+        async function initCloudDatabase() {
+            const badge = document.getElementById('cloud-status-badge');
+            
+            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                try {
+                    const firebaseAppModule = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
+                    const firebaseAuthModule = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+                    const firebaseFirestoreModule = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+
+                    const firebaseConfig = JSON.parse(__firebase_config);
+                    const app = firebaseAppModule.initializeApp(firebaseConfig);
+                    
+                    auth = firebaseAuthModule.getAuth(app);
+                    db = firebaseFirestoreModule.getFirestore(app);
+                    isCloudEnabled = true;
+
+                    firebase_signInAnonymously = firebaseAuthModule.signInAnonymously;
+                    firebase_onAuthStateChanged = firebaseAuthModule.onAuthStateChanged;
+                    firebase_GoogleAuthProvider = firebaseAuthModule.GoogleAuthProvider;
+                    firebase_signInWithPopup = firebaseAuthModule.signInWithPopup;
+                    firebase_signOut = firebaseAuthModule.signOut;
+
+                    firebase_doc = firebaseFirestoreModule.doc;
+                    firebase_setDoc = firebaseFirestoreModule.setDoc;
+                    firebase_getDoc = firebaseFirestoreModule.getDoc;
+                    firebase_getDocs = firebaseFirestoreModule.getDocs;
+                    firebase_collection = firebaseFirestoreModule.collection;
+                    
+                    firebase_onAuthStateChanged(auth, async (user) => {
+                        if (user) {
+                            currentUserId = user.uid;
+                            document.getElementById('profile-cloud-id').value = currentUserId;
+                            
+                            const badgeType = document.getElementById('account-type-badge');
+                            if(user.isAnonymous) {
+                                badgeType.className = "text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded font-bold border border-amber-500/20";
+                                badgeType.innerText = "匿名暫存帳號";
+                                document.getElementById('btn-google-login').classList.remove('hidden');
+                                document.getElementById('btn-google-logout').classList.add('hidden');
+                            } else {
+                                badgeType.className = "text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-bold border border-emerald-500/20";
+                                badgeType.innerText = "Google 帳號連線";
+                                document.getElementById('btn-google-login').classList.add('hidden');
+                                document.getElementById('btn-google-logout').classList.remove('hidden');
+                            }
+
+                            badge.className = "bg-emerald-50 text-emerald-700 text-[10px] sm:text-xs px-2.5 py-1 rounded-full font-semibold border border-emerald-100 flex items-center gap-1.5";
+                            badge.innerHTML = `<i class="fa-solid fa-cloud-arrow-up"></i><span>雲端同步中</span>`;
+                            
+                            await syncFromCloud();
+                        } else {
+                            await firebase_signInAnonymously(auth);
+                        }
+                    });
+                } catch (e) {
+                    console.error("Firebase load failed:", e);
+                    setupFallbackOfflineMode(badge);
+                }
+            } else {
+                setupFallbackOfflineMode(badge);
+            }
+        }
+
+        async function loginWithGoogle() {
+            if (!isCloudEnabled || !auth) {
+                showToast("提示", "目前不支援雲端登入。", false);
+                return;
+            }
+            const provider = new firebase_GoogleAuthProvider();
+            try {
+                showToast("連線中", "正在打開 Google 授權視窗...", true);
+                await firebase_signInWithPopup(auth, provider);
+                showToast("登入成功", "已成功串接 Google 雲端儲存中心！", true);
+            } catch (err) {
+                console.error(err);
+                showToast("登入失敗", "取消了登入或網路超時。", false);
+            }
+        }
+
+        async function logoutFirebase() {
+            if (!auth) return;
+            showConfirmModal("確認登出？", "登出後將切換回本地匿名帳號。您的 Google 資料仍會安全保存在雲端。", async () => {
+                await firebase_signOut(auth);
+                showToast("已登出", "已安全切斷 Google 帳號連結。", true);
+            });
+        }
+
+        function setupFallbackOfflineMode(badge) {
+            isCloudEnabled = false;
+            currentUserId = localStorage.getItem('nutrack_offline_user_id') || generateUUID();
+            localStorage.setItem('nutrack_offline_user_id', currentUserId);
+            document.getElementById('profile-cloud-id').value = currentUserId;
+            
+            badge.className = "bg-slate-100 text-slate-500 text-[10px] sm:text-xs px-2.5 py-1 rounded-full font-semibold border border-slate-200 flex items-center gap-1.5";
+            badge.innerHTML = `<i class="fa-solid fa-cloud"></i><span>本機快取模式</span>`;
+            loadLocalData();
+        }
+
+        async function syncFromCloud() {
+            if (!isCloudEnabled || !currentUserId) return;
+            try {
+                const profileRef = firebase_doc(db, 'artifacts', appId, 'users', currentUserId, 'profile', 'config');
+                const profileSnap = await firebase_getDoc(profileRef);
+                if (profileSnap.exists()) {
+                    userProfile = profileSnap.data();
+                } else {
+                    await firebase_setDoc(profileRef, userProfile);
+                }
+
+                const logsCollectionRef = firebase_collection(db, 'artifacts', appId, 'users', currentUserId, 'dietLogs');
+                const logsSnap = await firebase_getDocs(logsCollectionRef);
+                const loadedLogs = {};
+                logsSnap.forEach(doc => { loadedLogs[doc.id] = doc.data(); });
+
+                if (Object.keys(loadedLogs).length > 0) {
+                    dietLogs = loadedLogs;
+                } else {
+                    dietLogs = getMockData();
+                    for (const [dateKey, logItem] of Object.entries(dietLogs)) {
+                        await firebase_setDoc(firebase_doc(db, 'artifacts', appId, 'users', currentUserId, 'dietLogs', dateKey), logItem);
+                    }
+                }
+                activeDate = getTodayDateString();
+                if (!dietLogs[activeDate]) {
+                    dietLogs[activeDate] = { meals: [], water: 0, weight: userProfile.weight, burned: 0 };
+                }
+                syncFormValues();
+                calculateBMR_TDEE();
+                onActiveDateChanged();
+            } catch (err) {
+                console.error("Cloud syncing failed:", err);
+                loadLocalData();
+            }
+        }
+
+        function loadLocalData() {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                try {
+                    const parsed = JSON.parse(stored);
+                    if (parsed.userProfile) userProfile = parsed.userProfile;
+                    if (parsed.dietLogs) dietLogs = parsed.dietLogs;
+                } catch (e) {}
+            } else {
+                dietLogs = getMockData();
+                saveToLocalStorage();
+            }
+            activeDate = getTodayDateString();
+            if (!dietLogs[activeDate]) {
+                dietLogs[activeDate] = { meals: [], water: 0, weight: userProfile.weight, burned: 0 };
+            }
+            syncFormValues();
+            calculateBMR_TDEE();
+            onActiveDateChanged();
+        }
+
+        async function persistData(saveProfile = false, saveLogDate = null) {
+            saveToLocalStorage();
+            if (!isCloudEnabled || !currentUserId) return;
+            try {
+                if (saveProfile) {
+                    await firebase_setDoc(firebase_doc(db, 'artifacts', appId, 'users', currentUserId, 'profile', 'config'), userProfile);
+                }
+                if (saveLogDate && dietLogs[saveLogDate]) {
+                    await firebase_setDoc(firebase_doc(db, 'artifacts', appId, 'users', currentUserId, 'dietLogs', saveLogDate), dietLogs[saveLogDate]);
+                }
+            } catch (err) {}
+        }
+
+        function copyUserId() {
+            const cleanId = document.getElementById('profile-cloud-id').value;
+            const tempInput = document.createElement('input');
+            tempInput.value = cleanId;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            showToast("複製成功", "用戶金鑰 ID 已成功複製！", true);
+        }
+
+        function getMockData() {
+            const today = getTodayDateString();
+            const data = {};
+            for (let i = 4; i >= 0; i--) {
+                const d = parseDate(today); d.setDate(d.getDate() - i);
+                const dStr = formatDate(d);
+                data[dStr] = {
+                    meals: [
+                        { id: 'm1-'+i, name: '烤雞胸肉地瓜沙拉', category: '午餐', calories: 550, carbs: 45, protein: 35, fat: 12 },
+                        { id: 'm2-'+i, name: '無糖熱拿鐵', category: '早餐', calories: 120, carbs: 10, protein: 8, fat: 6 }
+                    ],
+                    water: 1250, weight: 72.0, burned: i > 0 ? 250 : 0
+                };
+            }
+            return data;
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ userProfile, dietLogs }));
+        }
+
+        function syncFormValues() {
+            document.getElementById('profile-height').value = userProfile.height;
+            document.getElementById('profile-weight').value = userProfile.weight;
+            document.getElementById('profile-age').value = userProfile.age;
+            document.getElementById('profile-activity').value = userProfile.activity;
+            document.getElementById('profile-goal').value = userProfile.goal;
+            document.getElementById('profile-target-weight').value = userProfile.targetWeight;
+            setGenderUI(userProfile.gender);
+        }
+
+        function setGender(gender) { userProfile.gender = gender; setGenderUI(gender); }
+
+        function setGenderUI(gender) {
+            const m = document.getElementById('gender-male'); const f = document.getElementById('gender-female');
+            if (gender === 'male') {
+                m.className = "gender-btn py-2.5 rounded-xl border border-emerald-500 bg-emerald-50 text-emerald-700 text-xs font-bold transition";
+                f.className = "gender-btn py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 text-xs font-bold transition";
+            } else {
+                m.className = "gender-btn py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-600 text-xs font-bold transition";
+                f.className = "gender-btn py-2.5 rounded-xl border border-emerald-500 bg-emerald-50 text-emerald-700 text-xs font-bold transition";
+            }
+        }
+
+        function saveUserProfile() {
+            userProfile.height = Number(document.getElementById('profile-height').value) || 175;
+            userProfile.weight = Number(document.getElementById('profile-weight').value) || 72;
+            userProfile.age = Number(document.getElementById('profile-age').value) || 28;
+            userProfile.activity = Number(document.getElementById('profile-activity').value) || 1.55;
+            userProfile.goal = document.getElementById('profile-goal').value;
+            userProfile.targetWeight = Number(document.getElementById('profile-target-weight').value) || 65;
+
+            if (activeDate === getTodayDateString()) {
+                if (!dietLogs[activeDate]) dietLogs[activeDate] = { meals: [], water: 0, weight: userProfile.weight, burned: 0 };
+                else dietLogs[activeDate].weight = userProfile.weight;
+            }
+            calculateBMR_TDEE(); persistData(true, activeDate); renderDashboard();
+            showToast("成功", "生理指標已同步保存至雲端！", true);
+        }
+
+        function calculateBMR_TDEE() {
+            const h = userProfile.height; const w = userProfile.weight; const age = userProfile.age;
+            const bmiVal = Number((w / ((h / 100) ** 2)).toFixed(1));
+            document.getElementById('res-bmi').innerText = bmiVal;
+            document.getElementById('coach-bmi').innerText = bmiVal;
+            
+            let bmiText = "正常"; let color = "text-emerald-400 bg-emerald-500/20";
+            if (bmiVal < 18.5) { bmiText = "過輕"; color = "text-amber-400 bg-amber-500/20"; }
+            else if (bmiVal >= 24) { bmiText = "過重"; color = "text-red-400 bg-red-500/20"; }
+            document.getElementById('res-bmi-lbl').innerText = bmiText;
+            document.getElementById('res-bmi-lbl').className = `text-xs font-semibold px-2 py-0.5 rounded ${color}`;
+
+            let bmrVal = userProfile.gender === 'male' ? (10 * w) + (6.25 * h) - (5 * age) + 5 : (10 * w) + (6.25 * h) - (5 * age) - 161;
+            bmrVal = Math.round(bmrVal); document.getElementById('res-bmr').innerText = bmrVal.toLocaleString() + " 大卡";
+            const tdeeVal = Math.round(bmrVal * userProfile.activity); document.getElementById('res-tdee').innerText = tdeeVal.toLocaleString() + " 大卡";
+
+            let budgetVal = userProfile.goal === 'lose' ? tdeeVal - 500 : (userProfile.goal === 'gain' ? tdeeVal + 300 : tdeeVal);
+            budgetVal = Math.max(budgetVal, 1200);
+            document.getElementById('res-budget').innerText = budgetVal.toLocaleString() + " 大卡";
+            document.getElementById('current-goal-tag').innerText = userProfile.goal === 'lose' ? "減重減脂" : "增肌維持";
+            userProfile.computedBudget = budgetVal;
+        }
+
+        function onActiveDateChanged() {
+            if (!activeDate) activeDate = getTodayDateString();
+            if (!dietLogs[activeDate]) {
+                const sortedDates = Object.keys(dietLogs).sort();
+                let lastKnownWeight = userProfile.weight;
+                for (let dStr of sortedDates) {
+                    if (dStr < activeDate && dietLogs[dStr] && dietLogs[dStr].weight) {
+                        lastKnownWeight = dietLogs[dStr].weight;
+                    }
+                }
+                dietLogs[activeDate] = { meals: [], water: 0, weight: lastKnownWeight, burned: 0 };
+            } else if (dietLogs[activeDate].burned === undefined) {
+                dietLogs[activeDate].burned = 0;
+            }
+
+            const headerDatePicker = document.getElementById('header-active-date-picker');
+            if (headerDatePicker) headerDatePicker.value = activeDate;
+            
+            const headerDateString = document.getElementById('header-date-string');
+            if (headerDateString) headerDateString.innerText = formatDateString(activeDate);
+            
+            const currentDateLbl = document.getElementById('current-date-lbl');
+            if (currentDateLbl) currentDateLbl.innerText = formatDateString(activeDate);
+
+            document.querySelectorAll('.active-date-lbl').forEach(e => e.innerText = activeDate === getTodayDateString() ? "今日" : "指定日");
+            
+            const quickWeightInput = document.getElementById('quick-weight-input');
+            if (quickWeightInput) quickWeightInput.value = dietLogs[activeDate].weight || "";
+            
+            const weightQuickLbl = document.getElementById('weight-quick-lbl');
+            if (weightQuickLbl) weightQuickLbl.innerText = `${dietLogs[activeDate].weight || "--"} kg`;
+            
+            const quickBurnInput = document.getElementById('quick-burn-input');
+            if (quickBurnInput) quickBurnInput.value = dietLogs[activeDate].burned || 0;
+            
+            const burnQuickLbl = document.getElementById('burn-quick-lbl');
+            if (burnQuickLbl) burnQuickLbl.innerText = `${dietLogs[activeDate].burned || 0} kcal`;
+
+            renderDashboard(); renderDietLogs(); renderHistoryOverview();
+        }
+
+        function changeActiveDateByOffset(offset) {
+            const d = parseDate(activeDate); d.setDate(d.getDate() + offset);
+            activeDate = formatDate(d); onActiveDateChanged();
+        }
+
+        function onHeaderDatePickerChange(val) { if(val) { activeDate = val; onActiveDateChanged(); } }
+        function jumpToToday() { activeDate = getTodayDateString(); onActiveDateChanged(); }
+
+        function addWater(amount) {
+            if (!activeDate) activeDate = getTodayDateString();
+            if (!dietLogs[activeDate]) {
+                dietLogs[activeDate] = { meals: [], water: 0, weight: userProfile.weight, burned: 0 };
+            }
+            dietLogs[activeDate].water = (dietLogs[activeDate].water || 0) + amount;
+            persistData(false, activeDate); renderDashboard();
+            showToast("飲水記錄", `新增水量 ${amount}ml`, true);
+        }
+
+        function quickLogWeight() {
+            const w = Number(document.getElementById('quick-weight-input').value);
+            if(!w || w < 30) return;
+            if (!activeDate) activeDate = getTodayDateString();
+            if (!dietLogs[activeDate]) {
+                dietLogs[activeDate] = { meals: [], water: 0, weight: w, burned: 0 };
+            } else {
+                dietLogs[activeDate].weight = w;
+            }
+            if(activeDate === getTodayDateString()) { userProfile.weight = w; calculateBMR_TDEE(); }
+            persistData(true, activeDate); onActiveDateChanged();
+            showToast("完成", "體重更新成功", true);
+        }
+
+        function quickLogBurn() {
+            const b = Math.round(Number(document.getElementById('quick-burn-input').value));
+            if (!activeDate) activeDate = getTodayDateString();
+            if (!dietLogs[activeDate]) {
+                dietLogs[activeDate] = { meals: [], water: 0, weight: userProfile.weight, burned: b };
+            } else {
+                dietLogs[activeDate].burned = b;
+            }
+            persistData(false, activeDate); onActiveDateChanged();
+            showToast("完成", "運動消耗已計入", true);
+        }
+
+        function renderDashboard() {
+            if (!activeDate) activeDate = getTodayDateString();
+            if (!dietLogs[activeDate]) {
+                dietLogs[activeDate] = { meals: [], water: 0, weight: userProfile.weight, burned: 0 };
+            }
+            const log = dietLogs[activeDate]; 
+            const budget = userProfile.computedBudget || 1800; 
+            const burned = log.burned || 0;
+            
+            let tc = 0, tcarb = 0, tpro = 0, tfat = 0;
+            if(log.meals) log.meals.forEach(m => { tc+=m.calories; tcarb+=m.carbs; tpro+=m.protein; tfat+=m.fat; });
+
+            const adjustedBudget = budget + burned;
+            const rem = adjustedBudget - tc;
+
+            document.getElementById('calories-budget').innerText = budget.toLocaleString();
+            document.getElementById('calories-consumed').innerText = tc.toLocaleString();
+            document.getElementById('calories-burned').innerText = burned.toLocaleString();
+            document.getElementById('calories-remaining').innerText = Math.abs(rem).toLocaleString();
+            document.getElementById('calories-remaining-label').innerText = rem >= 0 ? "剩餘大卡" : "超出预算";
+
+            const circle = document.getElementById('calorie-progress-circle');
+            if (circle) {
+                const circumference = 2 * Math.PI * 84;
+                circle.style.strokeDasharray = `${circumference} ${circumference}`;
+                circle.style.strokeDashoffset = circumference - (Math.min(tc / adjustedBudget, 1) * circumference);
+            }
+
+            document.getElementById('carbs-ratio').innerText = `${tcarb}g / ${Math.round(adjustedBudget*0.45/4)}g`;
+            document.getElementById('carbs-bar').style.width = `${Math.min(tcarb/(adjustedBudget*0.45/4)*100, 100)}%`;
+            document.getElementById('protein-ratio').innerText = `${tpro}g / ${Math.round(adjustedBudget*0.25/4)}g`;
+            document.getElementById('protein-bar').style.width = `${Math.min(tpro/(adjustedBudget*0.25/4)*100, 100)}%`;
+            document.getElementById('fat-ratio').innerText = `${tfat}g / ${Math.round(adjustedBudget*0.30/9)}g`;
+            document.getElementById('fat-bar').style.width = `${Math.min(tfat/(adjustedBudget*0.30/9)*100, 100)}%`;
+
+            document.getElementById('water-text').innerText = `${log.water || 0} / 2500 ml`;
+            document.getElementById('water-bar').style.width = `${Math.min((log.water || 0)/2500*100, 100)}%`;
+            
+            document.getElementById('coach-cal-rem').innerText = `${rem} kcal`;
+            renderCharts();
+        }
+
+        function renderDietLogs() {
+            if (!activeDate) activeDate = getTodayDateString();
+            if (!dietLogs[activeDate]) {
+                dietLogs[activeDate] = { meals: [], water: 0, weight: userProfile.weight, burned: 0 };
+            }
+            const meals = dietLogs[activeDate].meals || [];
+            const ids = ['breakfast-list', 'lunch-list', 'dinner-list', 'snacks-list'];
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.innerHTML = "";
+            });
+            
+            let sums = { '早餐': 0, '午餐': 0, '晚餐': 0, '點心': 0 };
+
+            meals.forEach(m => {
+                let cat = m.category === '點心/宵夜' ? '點心' : m.category;
+                sums[cat] += m.calories;
+                const html = `<div class="py-2 flex justify-between items-center text-xs text-slate-700">
+                    <div><strong>${m.name}</strong> <span class="text-[10px] text-slate-400">(碳:${m.carbs} 蛋:${m.protein} 脂:${m.fat})</span></div>
+                    <div class="flex items-center gap-2"><span>${m.calories} kcal</span><button onclick="deleteMealItem('${m.category}','${m.id}')" class="text-red-400 hover:text-red-600"><i class="fa-solid fa-circle-minus"></i></button></div>
+                </div>`;
+                let targetId = cat === '早餐' ? 'breakfast-list' : (cat === '午餐' ? 'lunch-list' : (cat === '晚餐' ? 'dinner-list' : 'snacks-list'));
+                const targetEl = document.getElementById(targetId);
+                if (targetEl) targetEl.innerHTML += html;
+            });
+
+            document.getElementById('breakfast-sum').innerText = sums['早餐'] + " kcal";
+            document.getElementById('lunch-sum').innerText = sums['午餐'] + " kcal";
+            document.getElementById('dinner-sum').innerText = sums['晚餐'] + " kcal";
+            document.getElementById('snacks-sum').innerText = sums['點心'] + " kcal";
+        }
+
+        function renderHistoryOverview() {
+            const b = document.getElementById('history-table-body'); 
+            if (!b) return;
+            b.innerHTML = "";
+            
+            if (!activeDate) activeDate = getTodayDateString();
+            if (!dietLogs[activeDate]) {
+                dietLogs[activeDate] = { meals: [], water: 0, weight: userProfile.weight, burned: 0 };
+            }
+
+            const dates = Object.keys(dietLogs).sort().reverse().slice(0, 10);
+            dates.forEach(d => {
+                const log = dietLogs[d]; 
+                if (!log) return;
+                let tc = 0; 
+                if(log.meals) log.meals.forEach(m=>tc+=m.calories);
+                b.innerHTML += `<tr class="border-b border-slate-100 hover:bg-slate-50 transition">
+                    <td class="py-2.5 px-4 font-semibold">${d}</td>
+                    <td class="py-2.5 px-4">${tc} / <span class="text-amber-500">${log.burned || 0}</span> kcal</td>
+                    <td class="py-2.5 px-4">${userProfile.computedBudget}</td>
+                    <td class="py-2.5 px-4"><span class="px-2 py-0.5 rounded text-[10px] ${tc > (userProfile.computedBudget + (log.burned||0)) ? 'bg-red-50 text-red-600':'bg-emerald-50 text-emerald-600'}">${tc > (userProfile.computedBudget+(log.burned||0)) ? '超出預算':'控制良好'}</span></td>
+                    <td class="py-2.5 px-4 text-sky-600">${log.water || 0} ml</td>
+                    <td class="py-2.5 px-4 text-purple-600">${log.weight || 0} kg</td>
+                    <td class="py-2.5 px-4 text-center"><button onclick="changeActiveDateDirectly('${d}')" class="text-[11px] text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded bg-white hover:bg-emerald-50">進入</button></td>
+                </tr>`;
+            });
+        }
+
+        function changeActiveDateDirectly(d) { activeDate = d; onActiveDateChanged(); switchTab('dashboard'); }
+
+        function openManualMealModal() {
+            document.getElementById('manual-food-name').value = "";
+            document.getElementById('manual-food-calories').value = "";
+            document.getElementById('manual-food-carbs').value = "";
+            document.getElementById('manual-food-protein').value = "";
+            document.getElementById('manual-food-fat').value = "";
+            document.getElementById('manual-meal-modal').classList.remove('hidden');
+        }
+
+        function closeManualMealModal() {
+            document.getElementById('manual-meal-modal').classList.add('hidden');
+        }
+
+        function submitManualMeal() {
+            const name = document.getElementById('manual-food-name').value.trim();
+            const category = document.getElementById('manual-meal-category').value;
+            const calories = Number(document.getElementById('manual-food-calories').value) || 0;
+            const carbs = Number(document.getElementById('manual-food-carbs').value) || 0;
+            const protein = Number(document.getElementById('manual-food-protein').value) || 0;
+            const fat = Number(document.getElementById('manual-food-fat').value) || 0;
+
+            if(!name) return;
+            if (!activeDate) activeDate = getTodayDateString();
+            if (!dietLogs[activeDate]) {
+                dietLogs[activeDate] = { meals: [], water: 0, weight: userProfile.weight, burned: 0 };
+            }
+            dietLogs[activeDate].meals.push({ id: 'man-'+Date.now(), name, category, calories, carbs, protein, fat });
+            persistData(false, activeDate); closeManualMealModal(); onActiveDateChanged();
+            showToast("成功", "已成功手動紀錄食物", true);
+        }
+
+        function deleteMealItem(cat, id) {
+            showConfirmModal("確認刪除此項目？", "移除後不可恢復。", () => {
+                if (!activeDate) activeDate = getTodayDateString();
+                if (dietLogs[activeDate] && dietLogs[activeDate].meals) {
+                    dietLogs[activeDate].meals = dietLogs[activeDate].meals.filter(m => m.id !== id);
+                }
+                persistData(false, activeDate); onActiveDateChanged();
+            });
+        }
+
+        function promptClearLogs() {
+            showConfirmModal("確定重置今日數據？", "這會清空此日所有的飲食與喝水、運動消耗。", () => {
+                if (!activeDate) activeDate = getTodayDateString();
+                dietLogs[activeDate] = { meals: [], water: 0, weight: userProfile.weight, burned: 0 };
+                persistData(false, activeDate); onActiveDateChanged();
+            });
+        }
+
+        function showToast(title, msg, succ=true) {
+            const t = document.getElementById('toast'); document.getElementById('toast-title').innerText=title; document.getElementById('toast-message').innerText=msg;
+            t.classList.remove('translate-y-[-150%]'); setTimeout(() => t.classList.add('translate-y-[-150%]'), 2500);
+        }
+
+        function showConfirmModal(title, message, onYes) {
+            document.getElementById('confirm-title').innerText = title; document.getElementById('confirm-message').innerText = message;
+            const m = document.getElementById('confirm-modal'); m.classList.remove('hidden');
+            document.getElementById('confirm-btn-cancel').onclick = () => m.classList.add('hidden');
+            document.getElementById('confirm-btn-yes').onclick = () => { onYes(); m.classList.add('hidden'); };
+        }
+
+        let base64FoodImage = null; let foodImageMime = "";
+        function previewUpload(e) {
+            const file = e.target.files[0]; if(!file) return;
+            foodImageMime = file.type; const r = new FileReader();
+            r.onload = function(evt) {
+                base64FoodImage = evt.target.result.split(',')[1];
+                document.getElementById('upload-prompt').classList.add('hidden');
+                document.getElementById('upload-preview-container').classList.remove('hidden');
+                document.getElementById('upload-preview-img').src = evt.target.result;
+            };
+            r.readAsDataURL(file);
+        }
+
+        function cancelImage() {
+            base64FoodImage = null; document.getElementById('ai-food-file-input').value = "";
+            document.getElementById('upload-preview-container').classList.add('hidden');
+            document.getElementById('upload-prompt').classList.remove('hidden');
+        }
+
+        async function fetchGeminiWithBackoff(url, payload, maxRetries = 5) {
+            let delay = 1000;
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                    if (response.ok) return await response.json();
+                } catch (error) { if (i === maxRetries - 1) throw error; }
+                await new Promise(r => setTimeout(r, delay)); delay *= 2;
+            }
+        }
+
+        async function analyzeDietWithAI() {
+            const txt = document.getElementById('ai-food-text-input').value.trim();
+            const cat = document.getElementById('ai-meal-type').value;
+            if(!txt && !base64FoodImage) return;
+
+            const loader = document.getElementById('ai-loading-status'); loader.classList.remove('hidden');
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            
+            const parts = [{ text: `請分析此食物圖片或文字：'${txt}'。並返回結構化的營養素 JSON，分類建議為：'${cat}'。` }];
+            if (base64FoodImage) parts.push({ inlineData: { mimeType: foodImageMime || "image/png", data: base64FoodImage } });
+
+            const payload = {
+                contents: [{ role: "user", parts }],
+                systemInstruction: { parts: [{ text: "你是一位營養師 AI。請根據照片或文字，返回食物營養成分分析 JSON 數據。" }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            meals: {
+                                type: "ARRAY",
+                                items: {
+                                    type: "OBJECT",
+                                    properties: {
+                                        name: { type: "STRING" },
+                                        category: { type: "STRING" },
+                                        calories: { type: "NUMBER" },
+                                        carbs: { type: "NUMBER" },
+                                        protein: { type: "NUMBER" },
+                                        fat: { type: "NUMBER" }
+                                    },
+                                    required: ["name", "category", "calories", "carbs", "protein", "fat"]
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            try {
+                const res = await fetchGeminiWithBackoff(url, payload);
+                const rTxt = res.candidates?.[0]?.content?.parts?.[0]?.text;
+                const parsed = JSON.parse(rTxt);
+                if(parsed.meals) {
+                    if (!activeDate) activeDate = getTodayDateString();
+                    if (!dietLogs[activeDate]) {
+                        dietLogs[activeDate] = { meals: [], water: 0, weight: userProfile.weight, burned: 0 };
+                    }
+                    parsed.meals.forEach(m => { m.id='ai-'+Date.now()+'-'+Math.floor(Math.random()*100); dietLogs[activeDate].meals.push(m); });
+                    persistData(false, activeDate); onActiveDateChanged();
+                    showToast("分析成功", `AI 已成功辨識食物！`, true);
+                }
+            } catch(e) { showToast("錯誤", "AI 分析暫時發生異常。", false); }
+            finally { loader.classList.add('hidden'); }
+        }
+
+        async function generateAICoachAdvice() {
+            const container = document.getElementById('coach-advice-container');
+            container.innerHTML = `<div class="text-center py-12 animate-pulse">教練正在細細審視您今日的健康數據...</div>`;
+            
+            if (!activeDate) activeDate = getTodayDateString();
+            if (!dietLogs[activeDate]) {
+                dietLogs[activeDate] = { meals: [], water: 0, weight: userProfile.weight, burned: 0 };
+            }
+            const log = dietLogs[activeDate]; 
+            let tc = 0; 
+            if(log.meals) log.meals.forEach(m=>tc+=m.calories);
+            
+            const prompt = `身高：${userProfile.height}cm, 體重：${userProfile.weight}kg, 目裝：${userProfile.goal}。今日攝取了 ${tc} kcal, 運動消耗 ${log.burned||0} kcal。請給予簡短活潑的健康生活點評與下一餐建議。`;
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+            try {
+                const res = await fetchGeminiWithBackoff(url, { contents: [{ parts: [{ text: prompt }] }], systemInstruction: { parts: [{ text: "你是陽光幽默的個人健身與營養 AI 教練，請用 150 字繁體中文給予充滿正能量的點評，多用 Emoji。" }] } });
+                const adviceText = res.candidates?.[0]?.content?.parts?.[0]?.text;
+                container.innerHTML = `<p class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm leading-relaxed text-sm">${adviceText.replace(/\n/g, '<br>')}</p>`;
+            } catch(e) { container.innerHTML = `<div class="text-red-500 text-xs">教練開小差去了，請稍後再試。</div>`; }
+        }
+
+        function renderCharts() {
+            const labels = []; const cals = []; const weights = []; const today = new Date();
+            for (let i = 6; i >= 0; i--) {
+                const temp = new Date(today); temp.setDate(temp.getDate() - i); const dStr = formatDate(temp);
+                labels.push(`${temp.getMonth() + 1}/${temp.getDate()}`);
+                const log = dietLogs[dStr] || { meals: [], weight: userProfile.weight };
+                let sum = 0; if(log.meals) log.meals.forEach(m=>sum+=m.calories);
+                cals.push(sum); weights.push(log.weight || userProfile.weight);
+            }
+
+            const cCal = document.getElementById('caloriesChart').getContext('2d');
+            if (caloriesChartInstance) caloriesChartInstance.destroy();
+            caloriesChartInstance = new Chart(cCal, { type: 'bar', data: { labels, datasets: [{ data: cals, backgroundColor: '#10b981' }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
+
+            const cW = document.getElementById('weightChart').getContext('2d');
+            if (weightChartInstance) weightChartInstance.destroy();
+            weightChartInstance = new Chart(cW, { type: 'line', data: { labels, datasets: [{ data: weights, borderColor: '#8b5cf6', fill: false }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } } });
+        }
+
+        function switchTab(tabId) {
+            document.getElementById('section-dashboard').classList.add('hidden');
+            document.getElementById('section-diet').classList.add('hidden');
+            document.getElementById('section-history').classList.add('hidden');
+            document.getElementById('section-profile').classList.add('hidden');
+            document.getElementById('section-coach').classList.add('hidden');
+
+            document.getElementById(`section-${tabId}`).classList.remove('hidden');
+
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.className = "tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 flex items-center shrink-0";
+            });
+
+            const targetBtn = document.getElementById(`tab-${tabId}`);
+            if (targetBtn) {
+                targetBtn.className = "tab-btn px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all duration-200 text-emerald-700 bg-emerald-50 flex items-center shrink-0";
+                targetBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            }
+
+            if (tabId === 'diet') {
+                renderDietLogs();
+            } else if (tabId === 'dashboard') {
+                renderDashboard();
+            } else if (tabId === 'history') {
+                renderHistoryOverview();
+            }
+        }
+
+        async function startApp() {
+            await initCloudDatabase();
+        }
+
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            startApp();
+        } else {
+            window.addEventListener('DOMContentLoaded', startApp);
+        }
+    </script>
+</body>
+</html>
