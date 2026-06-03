@@ -442,6 +442,27 @@
                         </div>
                     </div>
 
+                    <div class="p-5 bg-gradient-to-tr from-emerald-900 to-emerald-950 text-white rounded-2xl border border-emerald-800 space-y-4 shadow-lg">
+                        <div class="flex items-center justify-between">
+                            <h4 class="font-bold text-sm text-emerald-400 flex items-center gap-2">
+                                <i class="fa-solid fa-brain"></i>Gemini AI 智能設定
+                            </h4>
+                        </div>
+                        <div class="space-y-2">
+                            <label class="block text-[11px] text-emerald-200 font-medium">請輸入您的 Google Gemini API Key</label>
+                            <div class="relative flex items-center">
+                                <input type="password" id="profile-gemini-key" placeholder="AIzaSy..." class="w-full bg-slate-950/60 border border-emerald-700/50 rounded-xl pl-4 pr-10 py-2.5 text-xs font-mono text-emerald-200 placeholder:text-emerald-700/60 focus:outline-none focus:border-emerald-500">
+                                <button onclick="toggleKeyVisibility()" class="absolute right-3 text-emerald-500 hover:text-emerald-400 transition">
+                                    <i id="toggle-key-icon" class="fa-solid fa-eye-slash text-xs"></i>
+                                </button>
+                            </div>
+                            <p class="text-[10px] text-emerald-300/70 leading-relaxed">金鑰將安全地保存在您本機瀏覽器快取中，僅用於對接飲食照片分析與隨身教練功能。</p>
+                        </div>
+                        <div class="flex justify-end pt-1">
+                            <button onclick="saveGeminiKey()" class="bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-sm active:scale-95">儲存金鑰</button>
+                        </div>
+                    </div>
+
                     <div class="p-5 bg-gradient-to-tr from-slate-900 to-slate-800 text-white rounded-2xl border border-slate-700 space-y-4 shadow-lg">
                         <div class="flex items-center justify-between">
                             <h4 class="font-bold text-sm text-emerald-400 flex items-center gap-2">
@@ -607,12 +628,11 @@
         }
 
         // ==========================================
-        // 🔐 你的專屬 Firebase 與 AI 核心金鑰配置區
+        // 🔐 你的專屬 Firebase 核心金鑰配置區
         // ==========================================
         const STORAGE_KEY = 'nutrack_ai_data_v2';
         const appId = 'nutrack-ai-app-default';
         
-        // 1. 將你獲取的完整 Firebase Web 配置填入此處
         const __firebase_config = JSON.stringify({
             apiKey: "AIzaSyD3GEITzzpkxXg8Z1ysYZ8y64lIXYo5QuU",
             authDomain: "aihealth-90e0a.firebaseapp.com",
@@ -623,8 +643,8 @@
             measurementId: "G-1CWV4VB3T2"
         });
 
-        // 2. 填入你的 Google Gemini API Key（若有），用於啟動 AI 食物分析功能
-        const apiKey = ""; 
+        // 🌟 核心金鑰改為從 LocalStorage 動態讀取
+        window.geminiApiKey = localStorage.getItem('nutrack_gemini_api_key') || "";
 
         // ==========================================
         
@@ -668,6 +688,10 @@
         window.copyUserId = copyUserId;
         window.loginWithGoogle = loginWithGoogle; 
         window.logoutFirebase = logoutFirebase;
+        
+        // 新增的 Gemini 相關管理函式
+        window.saveGeminiKey = saveGeminiKey;
+        window.toggleKeyVisibility = toggleKeyVisibility;
 
         function generateUUID() {
             if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -679,6 +703,10 @@
         async function initCloudDatabase() {
             const badge = document.getElementById('cloud-status-badge');
             
+            // 載入時將畫面的 Gemini Key 輸入框填入數值
+            const keyInput = document.getElementById('profile-gemini-key');
+            if (keyInput) keyInput.value = window.geminiApiKey;
+
             if (typeof __firebase_config !== 'undefined' && __firebase_config) {
                 try {
                     const firebaseAppModule = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
@@ -914,6 +942,27 @@
             }
             calculateBMR_TDEE(); persistData(true, activeDate); renderDashboard();
             showToast("成功", "生理指標已同步保存至雲端！", true);
+        }
+
+        // 儲存 使用者手動輸入的 Gemini Key
+        function saveGeminiKey() {
+            const keyVal = document.getElementById('profile-gemini-key').value.trim();
+            window.geminiApiKey = keyVal;
+            localStorage.setItem('nutrack_gemini_api_key', keyVal);
+            showToast("金鑰已儲存", "Gemini AI 金鑰已成功更新並保存在本機。", true);
+        }
+
+        // 切換密碼框的可視狀態
+        function toggleKeyVisibility() {
+            const input = document.getElementById('profile-gemini-key');
+            const icon = document.getElementById('toggle-key-icon');
+            if (input.type === "password") {
+                input.type = "text";
+                icon.className = "fa-solid fa-eye text-xs";
+            } else {
+                input.type = "password";
+                icon.className = "fa-solid fa-eye-slash text-xs";
+            }
         }
 
         function calculateBMR_TDEE() {
@@ -1220,12 +1269,19 @@
         }
 
         async function analyzeDietWithAI() {
+            // 安全防錯：若沒有金鑰，提示並切換到設定頁
+            if (!window.geminiApiKey) {
+                showToast("需要設定", "請先到「個人設定」填寫您的 Gemini API Key 才能開啟 AI 功能唷！", false);
+                switchTab('profile');
+                return;
+            }
+
             const txt = document.getElementById('ai-food-text-input').value.trim();
             const cat = document.getElementById('ai-meal-type').value;
             if(!txt && !base64FoodImage) return;
 
             const loader = document.getElementById('ai-loading-status'); loader.classList.remove('hidden');
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${window.geminiApiKey}`;
             
             const parts = [{ text: `請分析此食物圖片或文字：'${txt}'。並返回結構化的營養素 JSON，分類建議為：'${cat}'。` }];
             if (base64FoodImage) parts.push({ inlineData: { mimeType: foodImageMime || "image/png", data: base64FoodImage } });
@@ -1271,11 +1327,18 @@
                     persistData(false, activeDate); onActiveDateChanged();
                     showToast("分析成功", `AI 已成功辨識食物！`, true);
                 }
-            } catch(e) { showToast("錯誤", "AI 分析暫時發生異常。", false); }
+            } catch(e) { showToast("錯誤", "AI 分析暫時發生異常，請確認金鑰是否正確。", false); }
             finally { loader.classList.add('hidden'); }
         }
 
         async function generateAICoachAdvice() {
+            // 安全防錯：若沒有金鑰，提示並切換到設定頁
+            if (!window.geminiApiKey) {
+                showToast("需要設定", "請先到「個人設定」填寫您的 Gemini API Key 才能開啟 AI 教練功能唷！", false);
+                switchTab('profile');
+                return;
+            }
+
             const container = document.getElementById('coach-advice-container');
             container.innerHTML = `<div class="text-center py-12 animate-pulse">教練正在細細審視您今日的健康數據...</div>`;
             
@@ -1288,13 +1351,13 @@
             if(log.meals) log.meals.forEach(m=>tc+=m.calories);
             
             const prompt = `身高：${userProfile.height}cm, 體重：${userProfile.weight}kg, 目裝：${userProfile.goal}。今日攝取了 ${tc} kcal, 運動消耗 ${log.burned||0} kcal。請給予簡短活潑的健康生活點評與下一餐建議。`;
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${window.geminiApiKey}`;
 
             try {
                 const res = await fetchGeminiWithBackoff(url, { contents: [{ parts: [{ text: prompt }] }], systemInstruction: { parts: [{ text: "你是陽光幽默的個人健身與營養 AI 教練，請用 150 字繁體中文給予充滿正能量的點評，多用 Emoji。" }] } });
                 const adviceText = res.candidates?.[0]?.content?.parts?.[0]?.text;
                 container.innerHTML = `<p class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm leading-relaxed text-sm">${adviceText.replace(/\n/g, '<br>')}</p>`;
-            } catch(e) { container.innerHTML = `<div class="text-red-500 text-xs">教練開小差去了，請稍後再試。</div>`; }
+            } catch(e) { container.innerHTML = `<div class="text-red-500 text-xs">教練開小差去了，請檢查 API 金鑰後再試。</div>`; }
         }
 
         function renderCharts() {
