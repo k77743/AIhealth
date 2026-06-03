@@ -295,7 +295,7 @@
                                 <option value="點心">點心/宵夜</option>
                             </select>
                         </div>
-                        <button onclick="analyzeDietWithAI()" id="ai-analyze-btn" class="bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-sm font-bold py-2.5 px-6 rounded-xl shadow-sm flex items-center gap-2 transition active:scale-95">
+                        <button onclick="analyzeDietWithAI()" id="ai-analyze-btn" class="bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-sm font-bold py-2.5 px-6 rounded-xl shadow-sm flex items-center gap-2 transition active:scale-95 disabled:opacity-50 disabled:pointer-events-none">
                             <i class="fa-solid fa-brain"></i>AI 智能分析並記錄
                         </button>
                     </div>
@@ -534,7 +534,7 @@
                         <h2 class="text-xl font-bold text-slate-900">AI 智能健康隨身教練</h2>
                         <p class="text-xs text-slate-500 mt-1">分析您的生理數據、熱量與運動，提供精確點評。</p>
                     </div>
-                    <button onclick="generateAICoachAdvice()" class="bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-sm font-bold py-3 px-6 rounded-xl shadow-sm transition active:scale-95 whitespace-nowrap">生成個人化 AI 建議</button>
+                    <button onclick="generateAICoachAdvice()" id="ai-coach-btn" class="bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-sm font-bold py-3 px-6 rounded-xl shadow-sm transition active:scale-95 whitespace-nowrap disabled:opacity-50 disabled:pointer-events-none">生成個人化 AI 建議</button>
                 </div>
                 <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 pt-6">
                     <div class="lg:col-span-1 space-y-4">
@@ -627,10 +627,10 @@
         // ==========================================
         // 🔐 你的專屬 Firebase 與 AI 核心金鑰配置區
         // ==========================================
-        const STORAGE_KEY = 'nutrack_ai_data_v5';
+        // 🌟 順延升級為乾淨的緩存庫 V6，徹底清空之前多重連點留下的髒快取
+        const STORAGE_KEY = 'nutrack_ai_data_v6';
         const appId = 'nutrack-ai-app-default';
         
-        // 1. 將你獲取的完整 Firebase Web 配置填入此處
         const __firebase_config = JSON.stringify({
             apiKey: "AIzaSyD3GEITzzpkxXg8Z1ysYZ8y64lIXYo5QuU",
             authDomain: "aihealth-90e0a.firebaseapp.com",
@@ -641,7 +641,6 @@
             measurementId: "G-1CWV4VB3T2"
         });
 
-        // 🌟 核心金鑰改為從 LocalStorage 動態讀取
         window.geminiApiKey = localStorage.getItem('nutrack_gemini_api_key') || "";
 
         // ==========================================
@@ -687,7 +686,6 @@
         window.loginWithGoogle = loginWithGoogle; 
         window.logoutFirebase = logoutFirebase;
         
-        // 監聽金鑰輸入框變化，即時寫入緩存（防錯核心）
         window.handleKeyInput = function(val) {
             window.geminiApiKey = val.trim();
             localStorage.setItem('nutrack_gemini_api_key', window.geminiApiKey);
@@ -782,7 +780,7 @@
 
         async function logoutFirebase() {
             if (!auth) return;
-            showConfirmModal("確認登出？", "登出後將切換回本地匿名帳號。您的 Google 資料仍會 safe 保存在雲端。", async () => {
+            showConfirmModal("確認登出？", "登出後將切換回本地匿名帳號。您的 Google 資料仍會安全保存在雲端。", async () => {
                 await firebase_signOut(auth);
                 showToast("已登出", "已安全切斷 Google 帳號連結。", true);
             });
@@ -1267,9 +1265,11 @@
             const cat = document.getElementById('ai-meal-type').value;
             if(!txt && !base64FoodImage) return;
 
+            // 🌟 核心修正：觸發時立刻鎖定按鈕，防止高併發點擊引發 429 限制
+            const btn = document.getElementById('ai-analyze-btn');
+            if (btn) btn.disabled = true;
+
             const loader = document.getElementById('ai-loading-status'); loader.classList.remove('hidden');
-            
-            // 🌟 升級端點：直接換上 2026 當前主力正式版模型 gemini-2.0-flash
             const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + window.geminiApiKey;
             
             const parts = [{ text: `請分析此食物圖片或文字：'${txt}'。並返回結構化的營養素 JSON，分類建議為：'${cat}'。` }];
@@ -1316,8 +1316,12 @@
                     persistData(false, activeDate); onActiveDateChanged();
                     showToast("分析成功", `AI 已成功辨識食物！`, true);
                 }
-            } catch(e) { showToast("錯誤", "AI 分析暫時發生異常，請確認金鑰是否正確並已綁定信用卡方案。", false); }
-            finally { loader.classList.add('hidden'); }
+            } catch(e) { showToast("錯誤", "AI 分析頻率過快或發生異常，請稍等一分鐘再試。", false); }
+            finally { 
+                loader.classList.add('hidden'); 
+                // 🌟 任務完成解鎖按鈕
+                if (btn) btn.disabled = false;
+            }
         }
 
         async function generateAICoachAdvice() {
@@ -1326,6 +1330,10 @@
                 switchTab('profile');
                 return;
             }
+
+            // 🌟 核心修正：觸發時立刻鎖定隨身教練按鈕，防止重複生成引發 429
+            const btn = document.getElementById('ai-coach-btn');
+            if (btn) btn.disabled = true;
 
             const container = document.getElementById('coach-advice-container');
             container.innerHTML = `<div class="text-center py-12 animate-pulse">教練正在細細審視您今日的健康數據...</div>`;
@@ -1339,15 +1347,17 @@
             if(log.meals) log.meals.forEach(m=>tc+=m.calories);
             
             const prompt = `身高：${userProfile.height}cm, 體重：${userProfile.weight}kg, 目裝：${userProfile.goal}。今日攝取了 ${tc} kcal, 運動消耗 ${log.burned||0} kcal。請給予簡短活潑的健康生活點評與下一餐建議。`;
-            
-            // 🌟 升級端點：同步換上高效能的正式版模型 gemini-2.0-flash
             const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + window.geminiApiKey;
 
             try {
                 const res = await fetchGeminiWithBackoff(url, { contents: [{ parts: [{ text: prompt }] }], systemInstruction: { parts: [{ text: "你是陽光幽默的個人健身與營養 AI 教練，請用 150 字繁體中文給予充滿正能量的點評，多用 Emoji。" }] } });
                 const adviceText = res.candidates?.[0]?.content?.parts?.[0]?.text;
                 container.innerHTML = `<p class="bg-white p-4 rounded-xl border border-slate-100 shadow-sm leading-relaxed text-sm">${adviceText.replace(/\n/g, '<br>')}</p>`;
-            } catch(e) { container.innerHTML = `<div class="text-red-500 text-xs">教練開小差去了，請檢查 API 金鑰後再試。</div>`; }
+            } catch(e) { container.innerHTML = `<div class="text-red-500 text-xs">教練休息中，請稍後再點擊。</div>`; }
+            finally {
+                // 🌟 建議生成後解鎖按鈕
+                if (btn) btn.disabled = false;
+            }
         }
 
         function renderCharts() {
@@ -1398,11 +1408,9 @@
         }
 
         async function startApp() {
-            // 🌟 網頁就緒後，將快取金鑰塞回畫面輸入框
             const keyInput = document.getElementById('profile-gemini-key');
             if (keyInput) {
                 keyInput.value = window.geminiApiKey;
-                // 綁定動態輸入監聽，打字或貼上立即生效儲存（防止截斷破損）
                 keyInput.addEventListener('input', (e) => window.handleKeyInput(e.target.value));
             }
 
