@@ -458,9 +458,6 @@
                             </div>
                             <p class="text-[10px] text-emerald-300/70 leading-relaxed">金鑰將安全地保存在您本機瀏覽器快取中，僅用於對接飲食照片分析與隨身教練功能。</p>
                         </div>
-                        <div class="flex justify-end pt-1">
-                            <button onclick="saveGeminiKey()" class="bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-bold px-4 py-2 rounded-xl transition shadow-sm active:scale-95">儲存金鑰</button>
-                        </div>
                     </div>
 
                     <div class="p-5 bg-gradient-to-tr from-slate-900 to-slate-800 text-white rounded-2xl border border-slate-700 space-y-4 shadow-lg">
@@ -628,11 +625,12 @@
         }
 
         // ==========================================
-        // 🔐 你的專屬 Firebase 核心配置區 (已升級緩存 V3 庫)
+        // 🔐 你的專屬 Firebase 與 AI 核心金鑰配置區
         // ==========================================
-        const STORAGE_KEY = 'nutrack_ai_data_v3';
+        const STORAGE_KEY = 'nutrack_ai_data_v5';
         const appId = 'nutrack-ai-app-default';
         
+        // 1. 將你獲取的完整 Firebase Web 配置填入此處
         const __firebase_config = JSON.stringify({
             apiKey: "AIzaSyD3GEITzzpkxXg8Z1ysYZ8y64lIXYo5QuU",
             authDomain: "aihealth-90e0a.firebaseapp.com",
@@ -643,7 +641,7 @@
             measurementId: "G-1CWV4VB3T2"
         });
 
-        // 全域讀取動態 Gemini 金鑰
+        // 🌟 核心金鑰改為從 LocalStorage 動態讀取
         window.geminiApiKey = localStorage.getItem('nutrack_gemini_api_key') || "";
 
         // ==========================================
@@ -689,7 +687,11 @@
         window.loginWithGoogle = loginWithGoogle; 
         window.logoutFirebase = logoutFirebase;
         
-        window.saveGeminiKey = saveGeminiKey;
+        // 監聽金鑰輸入框變化，即時寫入緩存（防錯核心）
+        window.handleKeyInput = function(val) {
+            window.geminiApiKey = val.trim();
+            localStorage.setItem('nutrack_gemini_api_key', window.geminiApiKey);
+        };
         window.toggleKeyVisibility = toggleKeyVisibility;
 
         function generateUUID() {
@@ -780,7 +782,7 @@
 
         async function logoutFirebase() {
             if (!auth) return;
-            showConfirmModal("確認登出？", "登出後將切換回本地匿名帳號。您的 Google 資料仍會安全保存在雲端。", async () => {
+            showConfirmModal("確認登出？", "登出後將切換回本地匿名帳號。您的 Google 資料仍會 safe 保存在雲端。", async () => {
                 await firebase_signOut(auth);
                 showToast("已登出", "已安全切斷 Google 帳號連結。", true);
             });
@@ -937,13 +939,6 @@
             }
             calculateBMR_TDEE(); persistData(true, activeDate); renderDashboard();
             showToast("成功", "生理指標已同步保存至雲端！", true);
-        }
-
-        function saveGeminiKey() {
-            const keyVal = document.getElementById('profile-gemini-key').value.trim();
-            window.geminiApiKey = keyVal;
-            localStorage.setItem('nutrack_gemini_api_key', keyVal);
-            showToast("金鑰已儲存", "Gemini AI 金鑰已成功更新並保存在本機。", true);
         }
 
         function toggleKeyVisibility() {
@@ -1274,7 +1269,8 @@
 
             const loader = document.getElementById('ai-loading-status'); loader.classList.remove('hidden');
             
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${window.geminiApiKey}`;
+            // 🌟 升級端點：直接換上 2026 當前主力正式版模型 gemini-2.0-flash
+            const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + window.geminiApiKey;
             
             const parts = [{ text: `請分析此食物圖片或文字：'${txt}'。並返回結構化的營養素 JSON，分類建議為：'${cat}'。` }];
             if (base64FoodImage) parts.push({ inlineData: { mimeType: foodImageMime || "image/png", data: base64FoodImage } });
@@ -1320,7 +1316,7 @@
                     persistData(false, activeDate); onActiveDateChanged();
                     showToast("分析成功", `AI 已成功辨識食物！`, true);
                 }
-            } catch(e) { showToast("錯誤", "AI 分析暫時發生異常，請確認金鑰是否正確。", false); }
+            } catch(e) { showToast("錯誤", "AI 分析暫時發生異常，請確認金鑰是否正確並已綁定信用卡方案。", false); }
             finally { loader.classList.add('hidden'); }
         }
 
@@ -1344,7 +1340,8 @@
             
             const prompt = `身高：${userProfile.height}cm, 體重：${userProfile.weight}kg, 目裝：${userProfile.goal}。今日攝取了 ${tc} kcal, 運動消耗 ${log.burned||0} kcal。請給予簡短活潑的健康生活點評與下一餐建議。`;
             
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${window.geminiApiKey}`;
+            // 🌟 升級端點：同步換上高效能的正式版模型 gemini-2.0-flash
+            const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + window.geminiApiKey;
 
             try {
                 const res = await fetchGeminiWithBackoff(url, { contents: [{ parts: [{ text: prompt }] }], systemInstruction: { parts: [{ text: "你是陽光幽默的個人健身與營養 AI 教練，請用 150 字繁體中文給予充滿正能量的點評，多用 Emoji。" }] } });
@@ -1401,9 +1398,13 @@
         }
 
         async function startApp() {
-            // 🌟 安全修正：確保 DOM 完全載入完成後，才進行畫面的初始化操作與金鑰填入
+            // 🌟 網頁就緒後，將快取金鑰塞回畫面輸入框
             const keyInput = document.getElementById('profile-gemini-key');
-            if (keyInput) keyInput.value = window.geminiApiKey;
+            if (keyInput) {
+                keyInput.value = window.geminiApiKey;
+                // 綁定動態輸入監聽，打字或貼上立即生效儲存（防止截斷破損）
+                keyInput.addEventListener('input', (e) => window.handleKeyInput(e.target.value));
+            }
 
             await initCloudDatabase();
         }
