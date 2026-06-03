@@ -628,7 +628,7 @@
         }
 
         // ==========================================
-        // 🔐 你的專屬 Firebase 核心金鑰配置區
+        // 🔐 你的專屬 Firebase 核心配置區 (已升級緩存 V3 庫)
         // ==========================================
         const STORAGE_KEY = 'nutrack_ai_data_v3';
         const appId = 'nutrack-ai-app-default';
@@ -643,7 +643,7 @@
             measurementId: "G-1CWV4VB3T2"
         });
 
-        // 🌟 核心金鑰改為從 LocalStorage 動態讀取
+        // 全域讀取動態 Gemini 金鑰
         window.geminiApiKey = localStorage.getItem('nutrack_gemini_api_key') || "";
 
         // ==========================================
@@ -689,7 +689,6 @@
         window.loginWithGoogle = loginWithGoogle; 
         window.logoutFirebase = logoutFirebase;
         
-        // Gemini 相關管理函式
         window.saveGeminiKey = saveGeminiKey;
         window.toggleKeyVisibility = toggleKeyVisibility;
 
@@ -940,7 +939,6 @@
             showToast("成功", "生理指標已同步保存至雲端！", true);
         }
 
-        // 儲存 使用者手動輸入的 Gemini Key
         function saveGeminiKey() {
             const keyVal = document.getElementById('profile-gemini-key').value.trim();
             window.geminiApiKey = keyVal;
@@ -948,7 +946,6 @@
             showToast("金鑰已儲存", "Gemini AI 金鑰已成功更新並保存在本機。", true);
         }
 
-        // 切換密碼框的可視狀態
         function toggleKeyVisibility() {
             const input = document.getElementById('profile-gemini-key');
             const icon = document.getElementById('toggle-key-icon');
@@ -1404,7 +1401,7 @@
         }
 
         async function startApp() {
-            // 🌟 確保 DOM 樹就緒後才對輸入框賦值，防止 Null 錯誤中斷核心程式碼
+            // 🌟 安全修正：確保 DOM 完全載入完成後，才進行畫面的初始化操作與金鑰填入
             const keyInput = document.getElementById('profile-gemini-key');
             if (keyInput) keyInput.value = window.geminiApiKey;
 
